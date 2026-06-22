@@ -1,0 +1,36 @@
+name: deploy-production
+
+# Deploys to Railway production only when a GitHub Release is published.
+# release-please cuts the Release when its release PR is merged into main, so the
+# checked-out release tag is exactly the released version that gets deployed.
+
+on:
+  release:
+    types: [published]
+  # Manual trigger for the initial bootstrap deploy and ad-hoc redeploys.
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout released code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Deploy to Railway
+        run: railway up --service "$RAILWAY_SERVICE" --ci
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ vars.RAILWAY_SERVICE }}
