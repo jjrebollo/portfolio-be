@@ -91,6 +91,20 @@ See `.env.example`:
 - Routes are versioned under `/api/v1`.
 - The initial seed extracts the current portfolio content into the database for all supported locales.
 
+## Versioning & releases
+
+This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`)
+and uses [Conventional Commits](https://www.conventionalcommits.org/). Releases are
+automated with [release-please](https://github.com/googleapis/release-please):
+
+- Branching model: **GitHub Flow** — short-lived feature branches merged into `main` via PR.
+- Commit messages drive the version bump: `fix:` → patch, `feat:` → minor,
+  `feat!:` / `BREAKING CHANGE:` → minor while pre-`1.0.0` (major from `1.0.0` onward).
+- On every push to `main`, release-please maintains a release PR that updates
+  `package.json`, `CHANGELOG.md`, and—when merged—creates the git tag and GitHub Release.
+
+Common commit types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `perf`, `ci`, `build`.
+
 ## License
 
 Released under the [MIT License](./LICENSE).
