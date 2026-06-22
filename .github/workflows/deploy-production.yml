@@ -1,14 +1,13 @@
 name: deploy-production
 
-# Deploys to Railway production only when a GitHub Release is published.
-# release-please cuts the Release when its release PR is merged into main, so the
-# checked-out release tag is exactly the released version that gets deployed.
+# Deploys the current main branch to Railway. Runs in two situations:
+#   - workflow_dispatch: manual bootstrap / ad-hoc redeploys.
+#   - workflow_call: invoked by the release-please workflow when a release is
+#     created, so production deploys are gated on an actual release.
 
 on:
-  release:
-    types: [published]
-  # Manual trigger for the initial bootstrap deploy and ad-hoc redeploys.
   workflow_dispatch:
+  workflow_call:
 
 concurrency:
   group: production-deploy
@@ -18,7 +17,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout released code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Node

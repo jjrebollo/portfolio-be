@@ -123,7 +123,7 @@ The backend runs on [Railway](https://railway.app/): a NestJS service plus a man
 - **Build** — Nixpacks (`railway.json`), Node 22.
 - **Migrations on deploy** — the start command runs `prisma migrate deploy` before `node dist/main`.
 - **Health check** — Railway gates each deploy on `GET /api/v1/health`.
-- **Release-gated deploys** — `.github/workflows/deploy-production.yml` runs `railway up` only when release-please publishes a GitHub Release (plus a manual `workflow_dispatch` for bootstrap/ad-hoc deploys). It requires the `RAILWAY_TOKEN` secret and the `RAILWAY_SERVICE` variable.
+- **Release-gated deploys** — when release-please creates a release (its release PR is merged), the `release-please` workflow calls the reusable `deploy-production` workflow to run `railway up`, so production only deploys on an actual release. `deploy-production` is also runnable manually via `workflow_dispatch` for bootstrap/ad-hoc deploys. It requires the `RAILWAY_TOKEN` secret and the `RAILWAY_SERVICE` variable.
 
 Required production environment: `DATABASE_URL` (the Railway Postgres reference), `ADMIN_API_KEY`, and `NODE_ENV=production`. `PORT` is injected by Railway.
 
