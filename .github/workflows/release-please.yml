@@ -12,7 +12,20 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v5
+        id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  # When the release PR is merged, release-please creates the GitHub Release and
+  # sets releases_created. We deploy here, in the same run, instead of reacting
+  # to the `release: published` event — events raised by GITHUB_TOKEN do not
+  # trigger other workflows, so a `release`-triggered deploy would never fire.
+  deploy:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.releases_created == 'true' }}
+    uses: ./.github/workflows/deploy-production.yml
+    secrets: inherit
