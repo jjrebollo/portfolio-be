@@ -1,5 +1,15 @@
 # Portfolio Backend
 
+[![Version](https://img.shields.io/github/package-json/v/jjrebollo/portfolio-be?label=version&color=blue)](https://github.com/jjrebollo/portfolio-be/releases)
+[![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white)](https://nestjs.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-blue?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Node](https://img.shields.io/badge/Node-%E2%89%A5%2022-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Deployed on Railway](https://img.shields.io/badge/Deployed%20on-Railway-7B3FE4?logo=railway&logoColor=white)](https://railway.app/)
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-FE5196?logo=conventionalcommits&logoColor=white)](https://www.conventionalcommits.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
 Backend API for serving the portfolio content to the Astro frontend and future iOS and Android apps.
 
 ## Stack
@@ -28,25 +38,46 @@ The repository follows a CQRS-lite split (`PortfolioReadRepository` / `Portfolio
 
 ## API
 
-### Public
+All routes are versioned under `/api/v1`. Interactive docs (Swagger UI) live at `/docs`.
 
-- `GET /api/v1/health`
-- `GET /api/v1/portfolio/locales` — list locales with published content
-- `GET /api/v1/portfolio` — published content for the locale resolved from the `Accept-Language` header (defaults to `en`)
+Supported locales: `en`, `es`, `pt`.
 
-### Admin (requires `x-api-key` header)
+### Public (read-only)
 
-- `PUT /api/v1/admin/portfolio/:locale/draft` — create or update the draft
-- `GET /api/v1/admin/portfolio/:locale/draft` — read the current draft
-- `POST /api/v1/admin/portfolio/:locale/publish` — publish the current draft
+| Method & path | Description |
+| --- | --- |
+| `GET /api/v1/health` | Liveness probe → `{ "status": "ok", "service": "portfolio-be" }`. |
+| `GET /api/v1/portfolio/locales` | Locales that have published content → `{ "items": ["en", "es", "pt"] }`. |
+| `GET /api/v1/portfolio` | Published content for the locale resolved from the `Accept-Language` header (falls back to `en`). Returns `404` when the locale has no published snapshot. |
 
-Swagger UI is available at `/docs`.
+### Admin (requires the `x-api-key` header)
 
-Supported locales:
+The admin API is guarded by `ApiKeyGuard`, which compares `x-api-key` against `ADMIN_API_KEY` in constant time and **fails closed** when the key is not configured. Missing or invalid keys return `401`.
 
-- `en`
-- `es`
-- `pt`
+| Method & path | Description |
+| --- | --- |
+| `PUT /api/v1/admin/portfolio/:locale/draft` | Create or replace the `DRAFT` snapshot for a locale. The JSON body is validated against the versioned payload contract; invalid payloads return `400` with an `issues` array. |
+| `GET /api/v1/admin/portfolio/:locale/draft` | Read the current draft. `404` when no draft exists. |
+| `POST /api/v1/admin/portfolio/:locale/publish` | Promote the current draft to `PUBLISHED` (no body). `404` when there is no draft to publish. |
+
+Content lifecycle: **`PUT draft` → `POST publish`**. Public reads only ever expose `PUBLISHED` snapshots, so changes stay invisible to clients until they are published.
+
+#### Payload contract
+
+Draft writes are validated against a versioned [Zod](https://zod.dev/) schema (`schemaVersion`, currently `1`). The top-level shape is enforced while nested sections stay open (`passthrough`), so content can evolve without a migration:
+
+```jsonc
+{
+  "schemaVersion": 1,                          // optional, defaults to 1
+  "siteMeta": { "lang": "en", "title": "…" },  // lang + title required
+  "navigationLinks": [                          // array of { label, href }
+    { "label": "Skills", "href": "/#skills" }
+  ],
+  "siteContent": {}                             // any object
+}
+```
+
+Snapshot responses (public `GET /portfolio` and every admin endpoint) share one shape: the stored payload spread alongside `locale`, `status`, `publishedAt` (ISO string or `null`), and `updatedAt` (ISO string).
 
 ## Local setup
 
@@ -84,6 +115,27 @@ See `.env.example`:
 - `PORT`
 - `DATABASE_URL`
 - `ADMIN_API_KEY` — shared secret for the admin draft/publish API, sent via the `x-api-key` header. The admin endpoints fail closed when this is not configured.
+
+## Deployment
+
+The backend runs on [Railway](https://railway.app/): a NestJS service plus a managed PostgreSQL database.
+
+- **Build** — Nixpacks (`railway.json`), Node 22.
+- **Migrations on deploy** — the start command runs `prisma migrate deploy` before `node dist/main`.
+- **Health check** — Railway gates each deploy on `GET /api/v1/health`.
+- **Release-gated deploys** — `.github/workflows/deploy-production.yml` runs `railway up` only when release-please publishes a GitHub Release (plus a manual `workflow_dispatch` for bootstrap/ad-hoc deploys). It requires the `RAILWAY_TOKEN` secret and the `RAILWAY_SERVICE` variable.
+
+Required production environment: `DATABASE_URL` (the Railway Postgres reference), `ADMIN_API_KEY`, and `NODE_ENV=production`. `PORT` is injected by Railway.
+
+### Seeding production (one-time)
+
+`prisma migrate deploy` creates the schema but no rows, and `prisma:seed` relies on `ts-node` (a dev dependency that is absent from the production image). Seed the database once by running the script locally against the Railway Postgres **public** connection URL:
+
+```bash
+DATABASE_URL="<railway-postgres-public-url>" npm run prisma:seed
+```
+
+After the initial seed, content is managed at runtime through the admin draft/publish API — re-running the seed overwrites the published `en` / `es` / `pt` snapshots.
 
 ## Notes
 
