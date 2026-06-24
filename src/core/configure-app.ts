@@ -18,15 +18,14 @@ export function configureApp(app: INestApplication): void {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Portfolio Backend API')
-    .setDescription('Content API for the portfolio web, iOS, and Android clients.')
+    .setDescription(
+      'Content API for the portfolio web, iOS, and Android clients.',
+    )
     .setVersion('1.0.0')
     .addTag('health')
     .addTag('portfolio')
     .addTag('admin-portfolio')
-    .addApiKey(
-      { type: 'apiKey', name: 'x-api-key', in: 'header' },
-      'api-key',
-    )
+    .addApiKey({ type: 'apiKey', name: 'x-api-key', in: 'header' }, 'api-key')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);

@@ -99,13 +99,48 @@ Default API URL:
 ```bash
 npm run build
 npm run lint
+npm run lint:check
 npm run test
+npm run test:cov
 npm run test:e2e
 npm run prisma:generate
 npm run prisma:migrate:dev
 npm run prisma:migrate:deploy
 npm run prisma:seed
 ```
+
+## Testing
+
+Tests run on **Node 22** (the version this project targets).
+
+- **Unit tests** — fast and database-free; the boundaries are mocked. Coverage
+  is enforced via thresholds in the Jest config (`npm run test:cov`).
+- **End-to-end tests** — boot the real Nest application and exercise the HTTP API
+  against PostgreSQL. They run against an isolated `portfolio_test` database (never
+  development data) and apply migrations automatically before the suite.
+
+```bash
+npm test            # unit tests
+npm run test:cov    # unit tests + coverage (fails below thresholds)
+npm run test:e2e    # end-to-end tests (requires PostgreSQL)
+```
+
+For e2e locally, start the database and create the test database once:
+
+```bash
+docker compose up -d
+docker compose exec postgres createdb -U portfolio portfolio_test
+```
+
+The e2e runner uses `DATABASE_URL` when set, otherwise it defaults to the local
+`portfolio_test` database, plus `ADMIN_API_KEY` (default `e2e-admin-key`).
+
+### Continuous integration
+
+`.github/workflows/ci.yml` runs lint, build, unit tests (with coverage gates) and
+e2e tests — backed by a PostgreSQL service — on every push and pull request.
+Configure its `test` job as a required status check so pull requests cannot merge
+unless it passes.
 
 ## Environment
 

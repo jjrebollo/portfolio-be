@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Put,
@@ -37,10 +39,7 @@ export class AdminPortfolioController {
 
   @Put(':locale/draft')
   @ApiOkResponse({ description: 'The saved draft snapshot.' })
-  saveDraft(
-    @Param() params: AdminLocaleParamDto,
-    @Body() payload: unknown,
-  ) {
+  saveDraft(@Param() params: AdminLocaleParamDto, @Body() payload: unknown) {
     return this.saveDraftUseCase.execute(params.locale, payload);
   }
 
@@ -51,6 +50,7 @@ export class AdminPortfolioController {
   }
 
   @Post(':locale/publish')
+  @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ description: 'The published snapshot.' })
   publish(@Param() params: AdminLocaleParamDto) {
     return this.publishPortfolioUseCase.execute(params.locale);
