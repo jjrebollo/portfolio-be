@@ -1,0 +1,62 @@
+name: ci
+
+# Lint, build, unit tests (with coverage gates) and e2e tests on every push and
+# pull request. Configure this `test` job as a required status check so PRs
+# cannot merge unless it passes.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: portfolio_test
+          POSTGRES_USER: portfolio
+          POSTGRES_PASSWORD: portfolio
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U portfolio"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://portfolio:portfolio@localhost:5432/portfolio_test?schema=public
+      ADMIN_API_KEY: ci-admin-key
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint:check
+
+      - name: Build
+        run: npm run build
+
+      - name: Unit tests (with coverage thresholds)
+        run: npm run test:cov
+
+      - name: E2E tests
+        run: npm run test:e2e

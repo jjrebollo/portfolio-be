@@ -63,7 +63,9 @@ export class PrismaPortfolioRepository
       },
     });
 
-    return snapshots.map((snapshot) => snapshot.locale).filter(isSupportedLocale);
+    return snapshots
+      .map((snapshot) => snapshot.locale)
+      .filter(isSupportedLocale);
   }
 
   async upsertDraft(
