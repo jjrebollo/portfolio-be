@@ -1,6 +1,6 @@
 {
   "name": "portfolio-be",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Backend API serving localized portfolio content to the web, iOS, and Android clients.",
   "author": "Juan José Rebollo",
   "private": true,
