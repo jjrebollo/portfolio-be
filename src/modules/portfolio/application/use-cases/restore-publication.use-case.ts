@@ -12,7 +12,7 @@ import { SupportedLocale } from '../../domain/portfolio.types';
 import { toPortfolioResponse } from '../portfolio.mapper';
 
 @Injectable()
-export class PublishPortfolioUseCase {
+export class RestorePublicationUseCase {
   constructor(
     @Inject(PORTFOLIO_READ_REPOSITORY)
     private readonly portfolioReadRepository: PortfolioReadRepository,
@@ -20,24 +20,26 @@ export class PublishPortfolioUseCase {
     private readonly portfolioWriteRepository: PortfolioWriteRepository,
   ) {}
 
-  async execute(locale: SupportedLocale) {
-    const draft = await this.portfolioReadRepository.findByLocaleAndStatus(
+  async execute(locale: SupportedLocale, version: number) {
+    const publication = await this.portfolioReadRepository.findPublication(
       locale,
-      'DRAFT',
+      version,
     );
 
-    if (!draft) {
+    if (!publication) {
       throw new NotFoundException(
-        `No draft portfolio to publish for locale "${locale}".`,
+        `No publication version ${version} found for locale "${locale}".`,
       );
     }
 
-    const payload = parsePortfolioPayload(draft.payload);
-    const published = await this.portfolioWriteRepository.publish(
+    // Re-publishing a prior version appends a new history entry that copies it,
+    // keeping the history append-only.
+    const payload = parsePortfolioPayload(publication.payload);
+    const restored = await this.portfolioWriteRepository.publish(
       locale,
       payload,
     );
 
-    return toPortfolioResponse(published);
+    return toPortfolioResponse(restored);
   }
 }

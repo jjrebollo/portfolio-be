@@ -23,6 +23,18 @@ export interface PortfolioSnapshot {
   updatedAt: Date;
 }
 
+export interface PortfolioPublication {
+  locale: SupportedLocale;
+  version: number;
+  payload: PortfolioLocaleDocument;
+  publishedAt: Date;
+}
+
+export interface PortfolioPublicationSummary {
+  version: number;
+  publishedAt: Date;
+}
+
 export function isSupportedLocale(value: string): value is SupportedLocale {
   return SUPPORTED_LOCALES.includes(value as SupportedLocale);
 }

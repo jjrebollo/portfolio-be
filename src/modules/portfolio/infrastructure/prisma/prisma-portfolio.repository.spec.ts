@@ -23,8 +23,28 @@ function build() {
     findMany: jest.fn(),
     upsert: jest.fn(),
   };
-  const prisma = { portfolioSnapshot } as unknown as PrismaService;
-  return { repo: new PrismaPortfolioRepository(prisma), portfolioSnapshot };
+  const portfolioPublication = {
+    findFirst: jest.fn(),
+    create: jest.fn(),
+    findMany: jest.fn(),
+    findUnique: jest.fn(),
+  };
+  const $transaction = jest
+    .fn()
+    .mockImplementation((cb) =>
+      cb({ portfolioSnapshot, portfolioPublication }),
+    );
+  const prisma = {
+    portfolioSnapshot,
+    portfolioPublication,
+    $transaction,
+  } as unknown as PrismaService;
+  return {
+    repo: new PrismaPortfolioRepository(prisma),
+    portfolioSnapshot,
+    portfolioPublication,
+    $transaction,
+  };
 }
 
 describe('PrismaPortfolioRepository', () => {
@@ -82,15 +102,78 @@ describe('PrismaPortfolioRepository', () => {
     expect(result.status).toBe('DRAFT');
   });
 
-  it('upsertPublished writes a PUBLISHED snapshot with a publishedAt date', async () => {
-    const { repo, portfolioSnapshot } = build();
+  it('publish appends the next history version and updates the published snapshot in a transaction', async () => {
+    const { repo, portfolioSnapshot, portfolioPublication, $transaction } =
+      build();
+    portfolioPublication.findFirst.mockResolvedValue({ version: 2 });
+    portfolioPublication.create.mockResolvedValue({});
     portfolioSnapshot.upsert.mockResolvedValue(persisted);
 
-    await repo.upsertPublished('en', payload);
+    const result = await repo.publish('en', payload);
 
-    const arg = portfolioSnapshot.upsert.mock.calls[0][0];
-    expect(arg.create.status).toBe('PUBLISHED');
-    expect(arg.create.publishedAt).toBeInstanceOf(Date);
-    expect(arg.update.publishedAt).toBeInstanceOf(Date);
+    expect($transaction).toHaveBeenCalledTimes(1);
+    const createArg = portfolioPublication.create.mock.calls[0][0];
+    expect(createArg.data).toMatchObject({ locale: 'en', version: 3 });
+    expect(createArg.data.publishedAt).toBeInstanceOf(Date);
+
+    const upsertArg = portfolioSnapshot.upsert.mock.calls[0][0];
+    expect(upsertArg.create.status).toBe('PUBLISHED');
+    expect(upsertArg.create.publishedAt).toBeInstanceOf(Date);
+    expect(upsertArg.update.publishedAt).toBeInstanceOf(Date);
+    expect(result.status).toBe('PUBLISHED');
+  });
+
+  it('publish starts versioning at 1 when there is no history', async () => {
+    const { repo, portfolioSnapshot, portfolioPublication } = build();
+    portfolioPublication.findFirst.mockResolvedValue(null);
+    portfolioSnapshot.upsert.mockResolvedValue(persisted);
+
+    await repo.publish('en', payload);
+
+    expect(portfolioPublication.create.mock.calls[0][0].data.version).toBe(1);
+  });
+
+  it('listPublications returns version summaries, newest first', async () => {
+    const { repo, portfolioPublication } = build();
+    const rows = [
+      { version: 3, publishedAt: new Date('2026-01-03T00:00:00.000Z') },
+      { version: 2, publishedAt: new Date('2026-01-02T00:00:00.000Z') },
+    ];
+    portfolioPublication.findMany.mockResolvedValue(rows);
+
+    const result = await repo.listPublications('en');
+
+    expect(result).toEqual(rows);
+    expect(portfolioPublication.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { locale: 'en' },
+        orderBy: { version: 'desc' },
+      }),
+    );
+  });
+
+  it('findPublication maps a found version', async () => {
+    const { repo, portfolioPublication } = build();
+    portfolioPublication.findUnique.mockResolvedValue({
+      id: 'x',
+      locale: 'en',
+      version: 2,
+      payload,
+      publishedAt: new Date('2026-01-02T00:00:00.000Z'),
+    });
+
+    const result = await repo.findPublication('en', 2);
+
+    expect(portfolioPublication.findUnique).toHaveBeenCalledWith({
+      where: { locale_version: { locale: 'en', version: 2 } },
+    });
+    expect(result).toMatchObject({ locale: 'en', version: 2 });
+  });
+
+  it('findPublication returns null when the version is missing', async () => {
+    const { repo, portfolioPublication } = build();
+    portfolioPublication.findUnique.mockResolvedValue(null);
+
+    expect(await repo.findPublication('en', 99)).toBeNull();
   });
 });

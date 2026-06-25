@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ApiKeyGuard } from '../../core/security/api-key.guard';
 import { GetDraftUseCase } from './application/use-cases/get-draft.use-case';
+import { ListPublicationsUseCase } from './application/use-cases/list-publications.use-case';
 import { PublishPortfolioUseCase } from './application/use-cases/publish-portfolio.use-case';
+import { RestorePublicationUseCase } from './application/use-cases/restore-publication.use-case';
 import { SaveDraftUseCase } from './application/use-cases/save-draft.use-case';
 import { PortfolioModule } from './portfolio.module';
 import { AdminPortfolioController } from './presentation/http/admin-portfolio.controller';
@@ -13,6 +15,8 @@ import { AdminPortfolioController } from './presentation/http/admin-portfolio.co
     SaveDraftUseCase,
     GetDraftUseCase,
     PublishPortfolioUseCase,
+    ListPublicationsUseCase,
+    RestorePublicationUseCase,
     ApiKeyGuard,
   ],
 })

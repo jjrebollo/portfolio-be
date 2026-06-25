@@ -59,8 +59,14 @@ The admin API is guarded by `ApiKeyGuard`, which compares `x-api-key` against `A
 | `PUT /api/v1/admin/portfolio/:locale/draft` | Create or replace the `DRAFT` snapshot for a locale. The JSON body is validated against the versioned payload contract; invalid payloads return `400` with an `issues` array. |
 | `GET /api/v1/admin/portfolio/:locale/draft` | Read the current draft. `404` when no draft exists. |
 | `POST /api/v1/admin/portfolio/:locale/publish` | Promote the current draft to `PUBLISHED` (no body). `404` when there is no draft to publish. |
+| `GET /api/v1/admin/portfolio/:locale/publications` | List the publication history (version + timestamp), newest first → `{ "items": [{ "version": 2, "publishedAt": "…" }, …] }`. |
+| `POST /api/v1/admin/portfolio/:locale/publications/:version/restore` | Re-publish a prior version (no body). `404` when the version does not exist, `400` when `:version` is not an integer. |
 
 Content lifecycle: **`PUT draft` → `POST publish`**. Public reads only ever expose `PUBLISHED` snapshots, so changes stay invisible to clients until they are published.
+
+#### Publication history & rollback
+
+Every publish (including a restore) appends an immutable row to a versioned, append-only history (`PortfolioPublication`), written in the same transaction as the live snapshot. This means a bad publish can always be rolled back: list the versions, then `restore` the last good one — which itself becomes a new version, preserving the full audit trail. (This is complementary to Railway's whole-database backups, which cover catastrophic recovery.)
 
 #### Payload contract
 

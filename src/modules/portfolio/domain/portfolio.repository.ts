@@ -1,5 +1,7 @@
 import { PortfolioPayload } from './portfolio-payload.schema';
 import {
+  PortfolioPublication,
+  PortfolioPublicationSummary,
   PortfolioSnapshot,
   SnapshotStatus,
   SupportedLocale,
@@ -17,6 +19,13 @@ export interface PortfolioReadRepository {
     status: SnapshotStatus,
   ): Promise<PortfolioSnapshot | null>;
   listPublishedLocales(): Promise<SupportedLocale[]>;
+  listPublications(
+    locale: SupportedLocale,
+  ): Promise<PortfolioPublicationSummary[]>;
+  findPublication(
+    locale: SupportedLocale,
+    version: number,
+  ): Promise<PortfolioPublication | null>;
 }
 
 export interface PortfolioWriteRepository {
@@ -24,7 +33,8 @@ export interface PortfolioWriteRepository {
     locale: SupportedLocale,
     payload: PortfolioPayload,
   ): Promise<PortfolioSnapshot>;
-  upsertPublished(
+  // Publishes the payload and appends an immutable history entry atomically.
+  publish(
     locale: SupportedLocale,
     payload: PortfolioPayload,
   ): Promise<PortfolioSnapshot>;
