@@ -1,5 +1,8 @@
-import { PortfolioSnapshot } from '../domain/portfolio.types';
-import { toPortfolioResponse } from './portfolio.mapper';
+import {
+  PortfolioPublicationSummary,
+  PortfolioSnapshot,
+} from '../domain/portfolio.types';
+import { toPortfolioResponse, toPublicationSummary } from './portfolio.mapper';
 
 const payload = {
   schemaVersion: 1,
@@ -43,5 +46,19 @@ describe('toPortfolioResponse', () => {
 
     expect(response.publishedAt).toBeNull();
     expect(response.status).toBe('DRAFT');
+  });
+});
+
+describe('toPublicationSummary', () => {
+  it('maps version and serializes publishedAt to an ISO string', () => {
+    const summary: PortfolioPublicationSummary = {
+      version: 3,
+      publishedAt: new Date('2026-01-02T03:04:05.000Z'),
+    };
+
+    expect(toPublicationSummary(summary)).toEqual({
+      version: 3,
+      publishedAt: '2026-01-02T03:04:05.000Z',
+    });
   });
 });

@@ -24,3 +24,16 @@ model PortfolioSnapshot {
   @@unique([locale, status])
   @@index([status])
 }
+
+// Immutable, append-only history of published content. One row is written per
+// publish so a previous version can be restored if a publish goes wrong.
+model PortfolioPublication {
+  id          String   @id @default(cuid())
+  locale      String   @db.VarChar(5)
+  version     Int
+  payload     Json
+  publishedAt DateTime @default(now())
+
+  @@unique([locale, version])
+  @@index([locale, publishedAt])
+}

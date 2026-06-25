@@ -9,6 +9,8 @@ import {
 import {
   isSupportedLocale,
   PortfolioLocaleDocument,
+  PortfolioPublication,
+  PortfolioPublicationSummary,
   PortfolioSnapshot,
   SnapshotStatus,
   SupportedLocale,
@@ -68,6 +70,44 @@ export class PrismaPortfolioRepository
       .filter(isSupportedLocale);
   }
 
+  async listPublications(
+    locale: SupportedLocale,
+  ): Promise<PortfolioPublicationSummary[]> {
+    const publications = await this.prismaService.portfolioPublication.findMany(
+      {
+        where: { locale },
+        select: { version: true, publishedAt: true },
+        orderBy: { version: 'desc' },
+      },
+    );
+
+    return publications.map((publication) => ({
+      version: publication.version,
+      publishedAt: publication.publishedAt,
+    }));
+  }
+
+  async findPublication(
+    locale: SupportedLocale,
+    version: number,
+  ): Promise<PortfolioPublication | null> {
+    const publication =
+      await this.prismaService.portfolioPublication.findUnique({
+        where: { locale_version: { locale, version } },
+      });
+
+    if (!publication) {
+      return null;
+    }
+
+    return {
+      locale,
+      version: publication.version,
+      payload: publication.payload as unknown as PortfolioLocaleDocument,
+      publishedAt: publication.publishedAt,
+    };
+  }
+
   async upsertDraft(
     locale: SupportedLocale,
     payload: PortfolioPayload,
@@ -75,11 +115,35 @@ export class PrismaPortfolioRepository
     return this.upsert(locale, 'DRAFT', payload, null);
   }
 
-  async upsertPublished(
+  async publish(
     locale: SupportedLocale,
     payload: PortfolioPayload,
   ): Promise<PortfolioSnapshot> {
-    return this.upsert(locale, 'PUBLISHED', payload, new Date());
+    const data = payload as unknown as Prisma.InputJsonValue;
+    const publishedAt = new Date();
+
+    // Append the immutable history entry and update the live published snapshot
+    // in one transaction so they can never diverge.
+    const snapshot = await this.prismaService.$transaction(async (tx) => {
+      const latest = await tx.portfolioPublication.findFirst({
+        where: { locale },
+        orderBy: { version: 'desc' },
+        select: { version: true },
+      });
+      const version = (latest?.version ?? 0) + 1;
+
+      await tx.portfolioPublication.create({
+        data: { locale, version, payload: data, publishedAt },
+      });
+
+      return tx.portfolioSnapshot.upsert({
+        where: { locale_status: { locale, status: 'PUBLISHED' } },
+        create: { locale, status: 'PUBLISHED', payload: data, publishedAt },
+        update: { payload: data, publishedAt },
+      });
+    });
+
+    return this.toDomain(locale, snapshot);
   }
 
   private async upsert(

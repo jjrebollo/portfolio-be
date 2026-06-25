@@ -21,15 +21,29 @@ describe('Admin portfolio (e2e)', () => {
   });
 
   afterAll(async () => {
+    await prisma.portfolioPublication.deleteMany();
     await prisma.portfolioSnapshot.deleteMany();
     await app.close();
   });
 
   beforeEach(async () => {
+    await prisma.portfolioPublication.deleteMany();
     await prisma.portfolioSnapshot.deleteMany();
   });
 
   const server = () => app.getHttpServer();
+
+  async function publishTitle(title: string) {
+    await request(server())
+      .put('/api/v1/admin/portfolio/en/draft')
+      .set('x-api-key', key)
+      .send({ ...validPayload, siteMeta: { lang: 'en', title } })
+      .expect(200);
+    await request(server())
+      .post('/api/v1/admin/portfolio/en/publish')
+      .set('x-api-key', key)
+      .expect(200);
+  }
 
   it('rejects a request without an API key (401)', () =>
     request(server()).get('/api/v1/admin/portfolio/en/draft').expect(401));
@@ -101,4 +115,81 @@ describe('Admin portfolio (e2e)', () => {
       .expect(200);
     expect(publicRes.body).toMatchObject({ locale: 'en', status: 'PUBLISHED' });
   });
+
+  it('records a history version on each publish, newest first', async () => {
+    await publishTitle('Version one');
+    await publishTitle('Version two');
+
+    const history = await request(server())
+      .get('/api/v1/admin/portfolio/en/publications')
+      .set('x-api-key', key)
+      .expect(200);
+
+    expect(history.body.items).toHaveLength(2);
+    expect(
+      history.body.items.map((i: { version: number }) => i.version),
+    ).toEqual([2, 1]);
+  });
+
+  it('returns an empty history when nothing has been published', async () => {
+    const history = await request(server())
+      .get('/api/v1/admin/portfolio/en/publications')
+      .set('x-api-key', key)
+      .expect(200);
+
+    expect(history.body).toEqual({ items: [] });
+  });
+
+  it('restores a prior version and appends a new history entry', async () => {
+    await publishTitle('Version one');
+    await publishTitle('Version two');
+
+    // Live content is currently version two.
+    const before = await request(server())
+      .get('/api/v1/portfolio')
+      .set('Accept-Language', 'en')
+      .expect(200);
+    expect(before.body.siteMeta.title).toBe('Version two');
+
+    // Roll back to version one.
+    const restored = await request(server())
+      .post('/api/v1/admin/portfolio/en/publications/1/restore')
+      .set('x-api-key', key)
+      .expect(200);
+    expect(restored.body).toMatchObject({ locale: 'en', status: 'PUBLISHED' });
+    expect(restored.body.siteMeta.title).toBe('Version one');
+
+    // Public content reflects the rolled-back version.
+    const after = await request(server())
+      .get('/api/v1/portfolio')
+      .set('Accept-Language', 'en')
+      .expect(200);
+    expect(after.body.siteMeta.title).toBe('Version one');
+
+    // The restore is itself recorded as version three (append-only history).
+    const history = await request(server())
+      .get('/api/v1/admin/portfolio/en/publications')
+      .set('x-api-key', key)
+      .expect(200);
+    expect(
+      history.body.items.map((i: { version: number }) => i.version),
+    ).toEqual([3, 2, 1]);
+  });
+
+  it('returns 404 when restoring a non-existent version', () =>
+    request(server())
+      .post('/api/v1/admin/portfolio/en/publications/99/restore')
+      .set('x-api-key', key)
+      .expect(404));
+
+  it('returns 400 when the version is not an integer', () =>
+    request(server())
+      .post('/api/v1/admin/portfolio/en/publications/abc/restore')
+      .set('x-api-key', key)
+      .expect(400));
+
+  it('requires an API key for publication history (401)', () =>
+    request(server())
+      .get('/api/v1/admin/portfolio/en/publications')
+      .expect(401));
 });

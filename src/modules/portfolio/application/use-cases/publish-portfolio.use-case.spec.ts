@@ -31,13 +31,13 @@ describe('PublishPortfolioUseCase', () => {
       findByLocaleAndStatus: jest.fn().mockResolvedValue(draft),
     } as unknown as PortfolioReadRepository;
     const write = {
-      upsertPublished: jest.fn().mockResolvedValue(published),
+      publish: jest.fn().mockResolvedValue(published),
     } as unknown as PortfolioWriteRepository;
 
     const result = await new PublishPortfolioUseCase(read, write).execute('en');
 
     expect(read.findByLocaleAndStatus).toHaveBeenCalledWith('en', 'DRAFT');
-    expect(write.upsertPublished).toHaveBeenCalledWith(
+    expect(write.publish).toHaveBeenCalledWith(
       'en',
       expect.objectContaining({ schemaVersion: 1 }),
     );
@@ -49,12 +49,12 @@ describe('PublishPortfolioUseCase', () => {
       findByLocaleAndStatus: jest.fn().mockResolvedValue(null),
     } as unknown as PortfolioReadRepository;
     const write = {
-      upsertPublished: jest.fn(),
+      publish: jest.fn(),
     } as unknown as PortfolioWriteRepository;
 
     await expect(
       new PublishPortfolioUseCase(read, write).execute('en'),
     ).rejects.toThrow(NotFoundException);
-    expect(write.upsertPublished).not.toHaveBeenCalled();
+    expect(write.publish).not.toHaveBeenCalled();
   });
 });
